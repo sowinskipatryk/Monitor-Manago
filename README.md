@@ -11,7 +11,6 @@ https://k0nze.dev/posts/change-resolution-python-system-tray/ <br>
 https://stackoverflow.com/a/35816792/19256893 <br>
 https://logomakr.com/
 
-<br>
-<p align="center"><img src="./screens/manago1.png" alt="showcase_img1" class="centerImg" /></p>
-<br>
-<p align="center"><img src="./screens/manago2.png" alt="showcase_img2" class="centerImg" /></p>
+<p align="center">
+  <img src="./screens/showcase.gif" alt="animated" />
+</p>
