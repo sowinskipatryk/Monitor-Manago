@@ -3,33 +3,19 @@ import screen_brightness_control as sbc
 import win32api
 import win32con
 from PIL import Image
-from pystray import MenuItem, Icon
+from pystray import MenuItem, Icon, Menu
 
 
-def change_resolution():
+def change_resolution(width, height):
     # get displaydevice object of the primary monitor
     primary_monitor = win32api.EnumDisplayDevices()
 
     # get devmodew object containing monitor information
     devmodew = win32api.EnumDisplaySettings(primary_monitor.DeviceName, win32con.ENUM_CURRENT_SETTINGS)
 
-    # check current resolution
-    height = devmodew.PelsHeight
-    width = devmodew.PelsWidth
-
-    # set variables for new resolution
-    # if the resolution is set to 1920x1080, change it to 1280x720
-    # else (if the resolution is other than 1920x1080) change to 1920x1080 (native)
-    if width == 1920 and height == 1080:
-        new_width = 1280
-        new_height = 720
-    else:
-        new_width = 1920
-        new_height = 1080
-
     # assign variables to settings options
-    devmodew.PelsWidth = new_width
-    devmodew.PelsHeight = new_height
+    devmodew.PelsWidth = width
+    devmodew.PelsHeight = height
 
     # fill the options fields of devmode object
     devmodew.Fields = win32con.DM_PELSWIDTH | win32con.DM_PELSHEIGHT
@@ -38,25 +24,15 @@ def change_resolution():
     win32api.ChangeDisplaySettings(devmodew, 0)
 
 
-def change_refresh_rate():
+def change_refresh_rate(ref_rate):
     # get displaydevice object of the primary monitor
     primary_monitor = win32api.EnumDisplayDevices()
 
     # get devmodew object containing monitor information
     devmodew = win32api.EnumDisplaySettings(primary_monitor.DeviceName, win32con.ENUM_CURRENT_SETTINGS)
 
-    # check current refresh rate
-    ref_rate = devmodew.DisplayFrequency
-
-    # set variable for new refresh rate
-    # if refresh rate is equal to 144hz, change it to 60hz and vice versa
-    if ref_rate == 144:
-        new_ref_rate = 60
-    else:
-        new_ref_rate = 144
-
     # assign variable to settings options
-    devmodew.DisplayFrequency = new_ref_rate
+    devmodew.DisplayFrequency = ref_rate
 
     # fill the options field of devmode object
     devmodew.Fields = win32con.DM_DISPLAYFREQUENCY
@@ -65,25 +41,37 @@ def change_refresh_rate():
     win32api.ChangeDisplaySettings(devmodew, 0)
 
 
-def rotate_screen():
+def rotate_screen(orient_val):
     # get displaydevice object of the primary monitor
     primary_monitor = win32api.EnumDisplayDevices()
 
     # get devmodew object containing monitor information
     devmodew = win32api.EnumDisplaySettings(primary_monitor.DeviceName, win32con.ENUM_CURRENT_SETTINGS)
 
-    # swap screen widths and heights between each other
-    devmodew.PelsWidth, devmodew.PelsHeight = devmodew.PelsHeight, devmodew.PelsWidth
+    # get current display orientation
+    curr_disp_orient = devmodew.DisplayOrientation
 
-    # if the display orientation is equal to 0 (regular view) change the orientation value to 3 (rotate 270
-    # degrees left to get vertical view - personal preference)
-    if devmodew.DisplayOrientation == 0:
-        devmodew.DisplayOrientation = 3
-    else:
-        devmodew.DisplayOrientation = 0
+    # calculate the new display orientation
+    new_disp_orient = curr_disp_orient + orient_val
+
+    # lock the variable to range(4)
+    if new_disp_orient > 3:
+        new_disp_orient -= 4
+    if new_disp_orient < 0:
+        new_disp_orient += 4
+
+    # if screen rotation by 90 degrees
+    if orient_val % 2:
+        # swap screen widths and heights between each other
+        devmodew.PelsWidth, devmodew.PelsHeight = devmodew.PelsHeight, devmodew.PelsWidth
+
+    # set new display orientation
+    devmodew.DisplayOrientation = new_disp_orient
+
+    primary_flag = win32con.CDS_SET_PRIMARY | win32con.CDS_UPDATEREGISTRY
 
     # use windows api to pass the display settings written to devmode object
-    win32api.ChangeDisplaySettingsEx(primary_monitor.DeviceName, devmodew)
+    win32api.ChangeDisplaySettingsEx(primary_monitor.DeviceName, devmodew, primary_flag)
 
 
 def set_primary(index, monitors_list, monitor_arrangement):
@@ -172,7 +160,7 @@ def switch_primary():
         set_primary(new_primary, display_devices, monitor_arrangement)
 
 
-def switch_brightness():
+def change_brightness(brightness):
     # get a list of tuples containing notably the handle object and screen resolution information for each monitor
     monitors = win32api.EnumDisplayMonitors()
 
@@ -185,14 +173,8 @@ def switch_brightness():
             break
         i += 1
 
-    # get current brightness settings for primary monitor
-    curr_brightness = sbc.get_brightness()[i]
-
-    # if the brightness is set to 100 - change it to 25, otherwise change it to 100
-    if curr_brightness == 100:
-        sbc.set_brightness(25, display=i)
-    else:
-        sbc.set_brightness(100, display=i)
+    # set brightness for primary monitor
+    sbc.set_brightness(brightness, display=i)
 
 
 def on_quit():
@@ -206,11 +188,29 @@ image = Image.open('logo.png')
 
 # create menu
 menu = (
-    MenuItem('Switch brightness', switch_brightness),
-    MenuItem('Switch orientation', rotate_screen),
+    MenuItem('Change brightness', Menu(
+        MenuItem("100%", lambda: change_brightness(100)),
+        MenuItem("80%", lambda: change_brightness(80)),
+        MenuItem("60%", lambda: change_brightness(60)),
+        MenuItem("40%", lambda: change_brightness(40)),
+        MenuItem("20%", lambda: change_brightness(20)))),
+    MenuItem('Change refresh rate', Menu(
+        MenuItem("144Hz", lambda: change_refresh_rate(144)),
+        MenuItem("120Hz", lambda: change_refresh_rate(120)),
+        MenuItem("100Hz", lambda: change_refresh_rate(100)),
+        MenuItem("60Hz", lambda: change_refresh_rate(60)))),
+    MenuItem('Change resolution', Menu(
+        MenuItem("1920x1080 (16:9)", lambda: change_resolution(1920, 1080)),
+        MenuItem("1600x900 (16:9)", lambda: change_resolution(1600, 900)),
+        MenuItem("1366x768 (16:9)", lambda: change_resolution(1366, 768)),
+        MenuItem("1280x960 (4:3)", lambda: change_resolution(1280, 960)),
+        MenuItem("1024x768 (4:3)", lambda: change_resolution(1024, 768)),
+        MenuItem("800x600 (4:3)", lambda: change_resolution(800, 600)))),
+    MenuItem('Rotate screen', Menu(
+        MenuItem("180°", lambda: rotate_screen(2)),
+        MenuItem("90° CW", lambda: rotate_screen(-1)),
+        MenuItem("90° CCW", lambda: rotate_screen(1)))),
     MenuItem('Switch primary monitor', switch_primary),
-    MenuItem('Switch refresh rate', change_refresh_rate),
-    MenuItem('Switch resolution', change_resolution),
     MenuItem('Quit', on_quit)
 )
 
